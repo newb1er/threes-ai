@@ -63,11 +63,12 @@ int main(int argc, const char* argv[]) {
     if (stats.is_finished()) stats.summary();
   }
 
-  random_slider slide(slide_args);
+  // random_slider slide(slide_args);
+  merge_larger_agent slide(slide_args);
   random_placer place(place_args);
 
   while (!stats.is_finished()) {
-    //		std::cerr << "======== Game " << stats.step() << " ========" <<
+    // std::cerr << "======== Game " << stats.step() << " ========" <<
     // std::endl;
     slide.open_episode("~:" + place.name());
     place.open_episode(slide.name() + ":~");
@@ -77,8 +78,8 @@ int main(int argc, const char* argv[]) {
     while (true) {
       agent& who = game.take_turns(slide, place);
       action move = who.take_action(game.state());
-      //			std::cerr << game.state() << "#" << game.step()
-      //<< " " << who.name() << ": " << move << std::endl;
+      // std::cerr << game.state() << "#" << game.step() << " " << who.name()
+      //           << ": " << move << std::endl;
       if (game.apply_action(move) != true) break;
       if (who.check_for_win(game.state())) break;
     }

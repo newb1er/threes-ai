@@ -63,6 +63,96 @@ class agent {
 };
 
 /**
+ * base agent playing in heuristic style
+ */
+class merge_larger_agent : public agent {
+ private:
+  static const unsigned ONETWO_SCORE = 5;
+  static const unsigned SPACE_SCORE = 1;
+
+ public:
+  merge_larger_agent(const std::string& args = "") : agent(args) {}
+
+  /**
+   * merge larger pile first
+   * slide priority: left > up > right > down
+   */
+  virtual action take_action(const board& b) {
+    board _b = board(b);
+
+    unsigned horizontal_score = merge_larger(_b);
+    unsigned vertical_score = merge_larger(_b, true);
+
+    // std::cerr << "horizontal: " << horizontal_score << '\n';
+    // std::cerr << "vertical: " << vertical_score << '\n';
+
+    if (horizontal_score >= vertical_score && _b.slide(board::LEFT) != -1) {
+      return action::slide(board::LEFT);
+    } else if (horizontal_score < vertical_score && _b.slide(board::UP) != -1) {
+      return action::slide(board::UP);
+    } else if (_b.slide(board::RIGHT) != -1) {
+      return action::slide(board::RIGHT);
+    } else if (_b.slide(board::DOWN) != -1) {
+      return action::slide(board::DOWN);
+    }
+
+    return action();
+  }
+
+ private:
+  unsigned merge_larger(board& b, bool transpose = false) {
+    if (transpose) b.transpose();
+
+    unsigned space = 0;
+    unsigned score = 0;
+
+    // horizontal merge
+    for (unsigned r = 0; r < 4; ++r) {
+      board::row _row = b[r];
+      board::cell pivot = _row[0];
+
+      for (unsigned c = 1; c < 4; ++c) {
+        if (_row[c] == 0) { /* if empty, skip */
+          space = SPACE_SCORE;
+          continue;
+        }
+
+        if (pivot == 0) { /* if pivot is empty, swap */
+          pivot = _row[c];
+          continue;
+        }
+
+        if (_row[c] + pivot == 3) { /* a pair of 1 and 2*/
+          score += ONETWO_SCORE;
+
+          if (c < 3) {
+            pivot = _row[c + 1];
+            c++;
+          }
+          continue;
+        }
+
+        if (_row[c] > 2 && pivot > 2 &&
+            _row[c] == pivot) { /* not a pair of 1 and 2*/
+          score += pivot;
+
+          if (c < 3) {
+            pivot = _row[c + 1];
+            c++;
+          }
+        } else {
+          pivot = _row[c];
+        }
+      }
+    }
+
+    if (transpose) b.transpose();
+
+    return score + space;
+  }
+};
+
+/**
  * base agent for agents with randomness
  */
 class random_agent : public agent {
