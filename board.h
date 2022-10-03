@@ -126,6 +126,11 @@ class board {
     return itov(tile);
   }
 
+  static const uint8_t UP = 0;
+  static const uint8_t RIGHT = 1;
+  static const uint8_t DOWN = 2;
+  static const uint8_t LEFT = 3;
+
   /**
    * apply an action to the board
    * return the reward of the action, or -1 if the action is illegal
