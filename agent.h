@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <fstream>
 #include <map>
+#include <numeric>
 #include <random>
 #include <sstream>
 #include <string>
@@ -19,6 +20,7 @@
 
 #include "action.h"
 #include "board.h"
+#include "utils.h"
 #include "weight.h"
 
 class agent {
@@ -270,4 +272,67 @@ class random_slider : public random_agent {
 
  private:
   std::array<int, 4> opcode;
+};
+
+class ntuple_slider : public weight_agent {
+ public:
+  ntuple_slider(const std::string& args) : weight_agent(args) {
+    tuple_n = net.size();
+  }
+
+  void set_encoding(std::vector<std::vector<unsigned>>&& e) {
+    encodings = e;
+    this->entity_size = entity_size;
+  }
+
+  virtual action take_action(const board& b) {
+    auto weights = get_weights(b);
+    std::vector<weight::type> rewards;
+    rewards.reserve(4);
+
+    auto value = 0;
+
+    for (auto& w : weights) value += *w;
+
+    for (int i = 0; i < 4; ++i) {
+      board _b(b);
+      auto _r = _b.slide(i);
+
+      auto _w = get_weights(_b);
+      auto _v = 0;
+      for (auto& w : _w) _v += *w;
+
+      rewards.push_back(_r + _v);
+    }
+
+    size_t best_action = argmax(rewards.begin(), rewards.end());
+
+    auto loss = rewards.at(best_action) - value;
+    for (auto w : weights) *w += alpha * loss;
+
+    return action::slide(best_action);
+  }
+
+ private:
+  std::vector<std::vector<unsigned>> encodings;
+  size_t tuple_n;
+  unsigned entity_size;
+
+  std::vector<weight::type*> get_weights(const board& b) {
+    std::vector<weight::type*> w;
+    w.reserve(tuple_n);
+
+    for (auto i = 0; i < tuple_n; ++i) {
+      const auto enc = encodings.at(i);
+      auto idx = 0;
+
+      for (auto& e : enc) {
+        idx = (idx << 4) | b(e);
+      }
+
+      w.push_back(&net[i][idx]);
+    }
+
+    return w;
+  }
 };
