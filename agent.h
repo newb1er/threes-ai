@@ -10,7 +10,9 @@
 
 #pragma once
 #include <algorithm>
+#include <cmath>
 #include <fstream>
+#include <limits>
 #include <map>
 #include <numeric>
 #include <random>
@@ -278,11 +280,43 @@ class ntuple_slider : public weight_agent {
  public:
   ntuple_slider(const std::string& args) : weight_agent(args) {
     tuple_n = net.size();
+
+    prev_reward = 0;
   }
 
-  void set_encoding(std::vector<std::vector<unsigned>>&& e) {
-    encodings = e;
-    this->entity_size = entity_size;
+  void set_encoding(std::vector<std::vector<unsigned>>&& e) { encodings = e; }
+
+  virtual void open_episode(const std::string& flag = "") {
+    prev_reward = 0;
+    t.clear();
+    t.reserve(1000);
+  }
+
+  virtual void close_episode(const std::string& flag = "") {
+    float r = 0.0f;
+    float next_value = 0.0f;
+
+    for (auto iter = t.rbegin(); iter != t.rend(); ++iter) {
+      auto [current_state, _r] = *iter;
+
+      float current_value = 0.0f;
+      for (auto& w : current_state) current_value += *w;
+
+      auto loss = r + next_value - current_value;
+
+      /*
+      std::cout << "=============\n";
+      std::cout << "current_value: " << current_value << '\n';
+      std::cout << "reward: " << _r << '\n';
+      std::cout << "loss: " << loss << '\n';
+      std::cout << "=============\n";
+      */
+
+      for (auto& w : current_state) *w += alpha * loss;
+
+      next_value = current_value;
+      r = _r;
+    }
   }
 
   virtual action take_action(const board& b) {
@@ -292,45 +326,86 @@ class ntuple_slider : public weight_agent {
 
     auto value = 0;
 
-    for (auto& w : weights) value += *w;
+#pragma omp simd
+    for (size_t i = 0; i < weights.size(); ++i) value += *weights[i];
 
     for (int i = 0; i < 4; ++i) {
       board _b(b);
       auto _r = _b.slide(i);
 
+      if (_r == -1) {
+        rewards.push_back(std::numeric_limits<float>::lowest());
+        continue;
+      }
+
       auto _w = get_weights(_b);
-      auto _v = 0;
+      float _v = 0;
       for (auto& w : _w) _v += *w;
 
-      rewards.push_back(_r + _v);
+      rewards.push_back(static_cast<float>(reward_fn(_r)) + _v);
     }
 
     size_t best_action = argmax(rewards.begin(), rewards.end());
+    auto r = board(b).slide(best_action);
 
-    auto loss = rewards.at(best_action) - value;
-    for (auto w : weights) *w += alpha * loss;
+    // auto loss = (r == -1 ? 0 : rewards.at(best_action)) - value;
+    // for (auto w : weights) *w += alpha * loss;
 
-    return action::slide(best_action);
+    //prev_reward = board(b).slide(best_action);
+
+    board _b(b);
+    _b.slide(best_action);
+
+    if (r != -1) {
+      t.emplace_back(get_weights(_b), reward_fn(r));
+    }
+
+    /*
+    if (board(b).slide(best_action) == -1) {
+      std::cerr << "Invalid action.\n";
+      auto idx = 0;
+
+      std::cerr << "Best action: " << best_action << '\n';
+
+      std::cerr << "Current Board\n" << board(b) << '\n';
+
+      for (auto& r : rewards) {
+        std::cerr << "reward " << idx << ": " << r;
+        std::cerr << " | actual reward :" << board(b).slide(idx) << '\n';
+        ++idx;
+      }
+
+      std::cin >> idx;
+    }
+    */
+
+    return r == -1 ? action() : action::slide(best_action);
   }
 
  private:
   std::vector<std::vector<unsigned>> encodings;
   size_t tuple_n;
   unsigned entity_size;
+  board::reward prev_reward;
+  std::vector<std::pair<std::vector<weight::type*>, float>> t;
+
+  board::reward reward_fn(board::reward& r) {
+    return 1 << static_cast<int>(std::floor(std::log(r + 1))) << 5;
+  }
 
   std::vector<weight::type*> get_weights(const board& b) {
     std::vector<weight::type*> w;
     w.reserve(tuple_n);
 
-    for (auto i = 0; i < tuple_n; ++i) {
+    for (auto i = 0; i < encodings.size(); ++i) {
       const auto enc = encodings.at(i);
-      auto idx = 0;
+      uint32_t idx = 0;
 
       for (auto& e : enc) {
         idx = (idx << 4) | b(e);
       }
 
-      w.push_back(&net[i][idx]);
+      w.push_back(&net[i % 2][idx]);
     }
 
     return w;

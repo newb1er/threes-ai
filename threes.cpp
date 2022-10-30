@@ -19,6 +19,9 @@
 #include "statistics.h"
 
 int main(int argc, const char* argv[]) {
+  std::cin.tie(NULL);
+  std::ios_base::sync_with_stdio(false);
+
   std::cout << "Threes! Demo: ";
   std::copy(argv, argv + argc,
             std::ostream_iterator<const char*>(std::cout, " "));
@@ -66,15 +69,16 @@ int main(int argc, const char* argv[]) {
   // random_slider slide(slide_args);
   // merge_larger_agent slide(slide_args);
   ntuple_slider slide(slide_args);
-  slide.set_encoding({{0, 1, 2, 3, 4, 5},
-                      {4, 5, 6, 7, 8, 9},
-                      {5, 6, 7, 9, 10, 11},
-                      {9, 10, 11, 13, 14, 15}});
+  slide.set_encoding({
+    {0, 1, 2, 4, 5, 6},
+    {4, 5, 6, 8, 9, 10},
+    {5, 6, 7, 9, 10, 11},
+    {9, 10, 11, 13, 14, 15}
+  });
   random_placer place(place_args);
 
   while (!stats.is_finished()) {
-    // std::cerr << "======== Game " << stats.step() << " ========" <<
-    // std::endl;
+    // std::cerr << "======== Game " << stats.step() << " ========" << std::endl;
     slide.open_episode("~:" + place.name());
     place.open_episode(slide.name() + ":~");
 
@@ -83,8 +87,7 @@ int main(int argc, const char* argv[]) {
     while (true) {
       agent& who = game.take_turns(slide, place);
       action move = who.take_action(game.state());
-      // std::cerr << game.state() << "#" << game.step() << " " << who.name()
-      //           << ": " << move << std::endl;
+      // std::cerr << game.state() << "#" << game.step() << " " << who.name() << ": " << move << std::endl;
       if (game.apply_action(move) != true) break;
       if (who.check_for_win(game.state())) break;
     }
