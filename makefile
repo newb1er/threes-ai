@@ -1,8 +1,9 @@
 GXX=/usr/bin/g++
-GXXFLAGS=-std=c++11 -O3 -Wall -fmessage-length=0
+GXXFLAGS=-std=c++17 -O3 -Wall -fmessage-length=0
+GXXOMPFLAG=-fopenmp
 
 all: action.o agent.o board.o episode.o statistics.o
-	$(GXX) $(GXXFLAGS) -o threes threes.cpp
+	$(GXX) $(GXXFLAGS) $(GXXOMPFLAG) -o threes threes.cpp
 action.o: action.h
 	$(GXX) $(GXXFLAGS) -c action.h
 agent.o: agent.h action.o board.o weight.o
